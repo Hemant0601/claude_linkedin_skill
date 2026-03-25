@@ -20,8 +20,15 @@ def main():
 
     # --- Authentication ---
     if command == "login":
-        port = int(_get_flag("--port") or 8585)
-        result = auth.start_login_server(port)
+        email = _get_flag("--email")
+        password = _get_flag("--password")
+        if email and password:
+            # Direct login (works in remote/cloud environments)
+            result = auth.login_direct(email, password)
+        else:
+            # Browser-based login (works locally)
+            port = int(_get_flag("--port") or 8585)
+            result = auth.start_login_server(port)
         print_json(result)
 
     elif command == "status":
@@ -187,7 +194,8 @@ def print_usage():
     print("""LinkedIn Skill CLI - No developer app needed!
 
 Login:
-  login                             Opens browser to sign in to LinkedIn
+  login                             Opens browser to sign in (local)
+  login --email E --password P      Direct login (remote/cloud)
   status                            Check login status
   logout                            Log out
 

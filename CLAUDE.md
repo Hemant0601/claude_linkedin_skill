@@ -14,17 +14,19 @@ If the command fails with a module error, install first:
 pip install -e /home/user/claude_linkedin_skill
 ```
 
-If not logged in, start the browser-based login:
+If not logged in, Claude must ask the user for their LinkedIn email and password, then run:
 ```bash
-python -m linkedin_skill.cli login
+python -m linkedin_skill.cli login --email "user@example.com" --password "their_password"
 ```
-This opens a local web page at `http://localhost:8585` where the user signs in with their LinkedIn email/password directly in the browser. Credentials go straight to LinkedIn — never stored or logged. Once they sign in, the session is saved automatically and the CLI reports success.
+Credentials are sent directly to LinkedIn to establish a session — they are never stored or logged. Only the session cookie is cached locally.
+
+**Important**: Always ask the user to provide their email and password before running the login command. Never guess or assume credentials.
 
 ## Commands
 
 | Action | Command |
 |--------|---------|
-| Login (browser) | `python -m linkedin_skill.cli login` |
+| Login | `python -m linkedin_skill.cli login --email "<email>" --password "<password>"` |
 | Check login | `python -m linkedin_skill.cli status` |
 | Logout | `python -m linkedin_skill.cli logout` |
 | My profile | `python -m linkedin_skill.cli me` |
@@ -50,7 +52,7 @@ This opens a local web page at `http://localhost:8585` where the user signs in w
 ## Rules
 
 1. **Always check login status** before running any LinkedIn operation
-2. **If not logged in**, run the login command — it opens the browser, user signs in there
+2. **If not logged in**, ask the user for their LinkedIn email and password, then run the login command
 3. **Always confirm with the user** before: posting, sending messages, sending connection requests, deleting anything
 4. **Never store or log** the user's LinkedIn password
 5. **Parse JSON output** and present results in a clean, readable format
