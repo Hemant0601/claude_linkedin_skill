@@ -1,95 +1,61 @@
 # Claude LinkedIn Skill
 
-A Claude Code skill to interact with your LinkedIn account. Authenticate with your own LinkedIn and operate it in auto mode — post updates, engage with content, manage connections, and more.
+A Claude Code skill to operate your LinkedIn account. No developer app, no API keys, no OAuth setup. Just log in and go.
 
 ## Quick Start
 
-### 1. Create a LinkedIn Developer App
-
-Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps) and create an app:
-- Add `http://localhost:8585/callback` as an OAuth 2.0 redirect URL
-- Request access to **Share on LinkedIn** and **Sign In with LinkedIn using OpenID Connect**
-
-### 2. Configure
-
 ```bash
-cp .env.example .env
-# Edit .env with your Client ID and Client Secret
-```
-
-### 3. Install
-
-```bash
+# 1. Install
 pip install -e .
+
+# 2. Log in with your LinkedIn account
+python -m linkedin_skill.cli login
+
+# 3. Done! Start using it.
+python -m linkedin_skill.cli me              # View your profile
+python -m linkedin_skill.cli post "Hello!"   # Create a post
+python -m linkedin_skill.cli feed            # View your feed
 ```
 
-### 4. Authenticate
+## What Can It Do?
 
-```bash
-python -m linkedin_skill.cli auth
-```
-
-Open the displayed URL in your browser, authorize the app, and you're connected.
-
-### 5. Use
-
-```bash
-# View your profile
-python -m linkedin_skill.cli profile
-
-# Create a post
-python -m linkedin_skill.cli post "Hello LinkedIn!"
-
-# Post with a link
-python -m linkedin_skill.cli post-article "Check this out" "https://example.com"
-
-# React to a post
-python -m linkedin_skill.cli react urn:li:ugcPost:123456 LIKE
-
-# Comment on a post
-python -m linkedin_skill.cli comment urn:li:ugcPost:123456 "Great insight!"
-
-# Send a connection request
-python -m linkedin_skill.cli connect urn:li:person:ABC123 --message "Let's connect!"
-```
+| Feature | Command | Example |
+|---------|---------|---------|
+| **Login** | `login` | `linkedin login` |
+| **Your Profile** | `me` | `linkedin me` |
+| **View Profile** | `profile <id>` | `linkedin profile john-doe` |
+| **Search People** | `search-people <q>` | `linkedin search-people "ML engineer"` |
+| **Search Companies** | `search-companies <q>` | `linkedin search-companies "AI startup"` |
+| **Search Jobs** | `search-jobs <q>` | `linkedin search-jobs "python developer"` |
+| **Create Post** | `post <text>` | `linkedin post "Hello LinkedIn!"` |
+| **Post with Link** | `post-link <text> <url>` | `linkedin post-link "Read this" "https://..."` |
+| **View Feed** | `feed` | `linkedin feed --limit 5` |
+| **React** | `react <urn> [type]` | `linkedin react <urn> LIKE` |
+| **Comment** | `comment <urn> <text>` | `linkedin comment <urn> "Great!"` |
+| **Connect** | `connect <id>` | `linkedin connect john-doe --message "Hi!"` |
+| **Message** | `send <id> <text>` | `linkedin send john-doe "Hey!"` |
+| **Conversations** | `conversations` | `linkedin conversations` |
+| **Invitations** | `invitations` | `linkedin invitations` |
 
 ## Using with Claude Code
 
-This project includes a Claude Code skill at `.claude/skills/linkedin.md`. When using Claude Code in this repository, Claude can automatically:
+This repo includes a Claude Code skill (`.claude/skills/linkedin.md`). When using Claude Code here, just say things like:
 
-- Check your auth status and guide you through setup
-- Draft and publish LinkedIn posts
-- Engage with posts (like, comment)
-- Send connection requests
-- View your profile and analytics
+- "Log me in to LinkedIn"
+- "Post about AI trends on my LinkedIn"
+- "Find ML engineers and connect with them"
+- "Check my LinkedIn messages"
+- "React to posts in my feed"
 
-Just ask Claude things like:
-- "Post about the latest trends in AI on LinkedIn"
-- "Check my LinkedIn profile"
-- "React to this LinkedIn post"
+Claude handles everything — checking login, executing commands, and asking for your approval before any visible action.
 
-## Commands Reference
+## How It Works
 
-| Command | Description |
-|---------|-------------|
-| `auth` | Start OAuth authentication flow |
-| `auth-status` | Check if authenticated |
-| `logout` | Clear stored tokens |
-| `profile` | View your profile |
-| `post <text>` | Create a text post |
-| `post-article <text> <url>` | Post with link |
-| `post-image <text> <image_url>` | Post with image |
-| `delete-post <urn>` | Delete a post |
-| `org-post <org_id> <text>` | Post as organization |
-| `react <urn> [type]` | React to a post |
-| `comment <urn> <text>` | Comment on a post |
-| `get-comments <urn>` | View post comments |
-| `analytics <urn>` | View post engagement |
-| `connect <urn> [--message M]` | Send connection request |
-| `connections-count` | Get connection count |
+Uses the [`linkedin-api`](https://github.com/tomquirk/linkedin-api) library which authenticates directly with LinkedIn using your email/password — the same way the LinkedIn website works. No LinkedIn Developer App, no OAuth app registration, no API keys needed.
 
 ## Security
 
-- Tokens stored locally at `~/.config/claude-linkedin-skill/tokens.json` (owner-only permissions)
-- `.env` file is gitignored — your secrets stay local
-- Each user authenticates independently with their own LinkedIn account
+- Password is only used during login to establish a session cookie
+- Session cookies are cached by the library at `~/.linkedin_api/`
+- No credentials are stored in the project or committed to git
+- All actions that are visible to others (posts, messages, connections) require your explicit approval when used through Claude

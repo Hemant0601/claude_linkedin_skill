@@ -1,160 +1,125 @@
 # LinkedIn Skill
 
-Automate your LinkedIn account directly from Claude Code. This skill lets you authenticate with your own LinkedIn account and perform operations like posting, engaging, and managing connections — all in auto mode.
+Operate your LinkedIn account directly from Claude Code. No developer app, no API keys, no OAuth setup. Just log in and go.
 
-## Setup (One-Time)
+## How It Works
 
-Before using this skill, the user must:
+This skill uses the `linkedin-api` library which authenticates directly with LinkedIn using your email/password — the same way the LinkedIn website does. No LinkedIn Developer App needed.
 
-1. **Create a LinkedIn App** at https://www.linkedin.com/developers/apps
-   - Sign in with their LinkedIn account
-   - Click "Create App" and fill in app details
-   - Under the **Auth** tab, add `http://localhost:8585/callback` as a redirect URL
-   - Under the **Products** tab, request access to:
-     - "Share on LinkedIn" (for posting)
-     - "Sign In with LinkedIn using OpenID Connect" (for auth)
-   - Note the **Client ID** and **Client Secret**
+## First-Time Setup
 
-2. **Configure credentials** — create a `.env` file in this project root:
-   ```
-   LINKEDIN_CLIENT_ID=your_client_id
-   LINKEDIN_CLIENT_SECRET=your_client_secret
-   LINKEDIN_REDIRECT_URI=http://localhost:8585/callback
-   ```
+1. **Install**: `pip install -e .` (from the project root)
+2. **Login**: `python -m linkedin_skill.cli login`
+   - Enter your LinkedIn email and password when prompted
+   - That's it. You're connected.
+3. **Check status**: `python -m linkedin_skill.cli status`
 
-3. **Install dependencies**:
-   ```bash
-   pip install -e .
-   ```
+## Auto Mode Instructions
 
-## Authentication
+When the user wants to operate LinkedIn, Claude should:
 
-Run the auth flow to connect:
+1. **Always check login first**: `python -m linkedin_skill.cli status`
+2. **If not logged in**: Tell the user to run `python -m linkedin_skill.cli login` and enter their credentials
+3. **Execute the requested operation** using the CLI commands below
+4. **Always confirm with the user before**: posting, sending messages, sending connection requests, or deleting anything
+5. **Parse JSON output** and present results in a clean, readable format
+
+## Commands Reference
+
+### Login / Session
 ```bash
-python -m linkedin_skill.cli auth
+python -m linkedin_skill.cli login                    # Log in (prompts for email/password)
+python -m linkedin_skill.cli status                   # Check if logged in
+python -m linkedin_skill.cli logout                   # Log out
 ```
-This opens a local callback server and provides a URL. The user opens the URL in their browser, authorizes the app, and the token is saved locally at `~/.config/claude-linkedin-skill/tokens.json`.
-
-To check status: `python -m linkedin_skill.cli auth-status`
-To disconnect: `python -m linkedin_skill.cli logout`
-
-## Available Operations
 
 ### Profile
 ```bash
-python -m linkedin_skill.cli profile
+python -m linkedin_skill.cli me                       # Your profile
+python -m linkedin_skill.cli profile john-doe          # View anyone's profile by public ID
 ```
-Returns: name, email, profile picture URL.
 
-### Create Posts
+The `public_id` is the slug from someone's LinkedIn URL: `linkedin.com/in/john-doe` → `john-doe`
+
+### Search
 ```bash
-# Text post
+python -m linkedin_skill.cli search-people "machine learning engineer" --limit 5
+python -m linkedin_skill.cli search-companies "artificial intelligence" --limit 5
+python -m linkedin_skill.cli search-jobs "python developer" --limit 10
+```
+
+### Posts
+```bash
 python -m linkedin_skill.cli post "Your post text here"
-
-# Post with article/link
-python -m linkedin_skill.cli post-article "Check this out!" "https://example.com" --title "Article Title"
-
-# Post with image URL
-python -m linkedin_skill.cli post-image "Look at this!" "https://example.com/image.jpg"
-
-# Post as an organization page (requires admin access)
-python -m linkedin_skill.cli org-post <org_id> "Post text"
-
-# Delete a post
+python -m linkedin_skill.cli post "Check this out" --visibility CONNECTIONS
+python -m linkedin_skill.cli post-link "Great read!" "https://example.com" --title "Article"
 python -m linkedin_skill.cli delete-post <post_urn>
 ```
 
-Visibility options: `PUBLIC` (default) or `CONNECTIONS` (connections only).
-Use `--visibility CONNECTIONS` to limit visibility.
+### Feed
+```bash
+python -m linkedin_skill.cli feed                     # View your feed
+python -m linkedin_skill.cli feed --limit 5           # Limit results
+```
 
 ### Engagement
 ```bash
-# React to a post (LIKE, PRAISE, EMPATHY, INTEREST, APPRECIATION)
 python -m linkedin_skill.cli react <post_urn> LIKE
-
-# Comment on a post
+python -m linkedin_skill.cli react <post_urn> PRAISE
 python -m linkedin_skill.cli comment <post_urn> "Great insight!"
-
-# Get comments on a post
 python -m linkedin_skill.cli get-comments <post_urn>
-
-# Get post analytics
-python -m linkedin_skill.cli analytics <post_urn>
 ```
 
-### Connections / Network
+Reaction types: `LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`
+
+### Connections
 ```bash
-# Send a connection request
-python -m linkedin_skill.cli connect <profile_urn>
-
-# Send with personalized message
-python -m linkedin_skill.cli connect <profile_urn> --message "Hi, let's connect!"
-
-# Get connection count
-python -m linkedin_skill.cli connections-count
+python -m linkedin_skill.cli connect john-doe
+python -m linkedin_skill.cli connect john-doe --message "Hi, love your work!"
+python -m linkedin_skill.cli disconnect john-doe
+python -m linkedin_skill.cli invitations              # View pending invites
+python -m linkedin_skill.cli accept <id> <secret>     # Accept an invite
 ```
 
-## Auto Mode Usage
+### Messaging
+```bash
+python -m linkedin_skill.cli conversations            # List recent conversations
+python -m linkedin_skill.cli messages <conversation_id>  # Read messages
+python -m linkedin_skill.cli send john-doe "Hey, how are you?"
+```
 
-When the user says "auto mode" or asks to automate LinkedIn tasks, Claude should:
+## Example Auto Mode Flows
 
-1. **Check auth**: Run `python -m linkedin_skill.cli auth-status` first
-2. **If not authenticated**: Guide the user through the auth flow
-3. **Execute operations**: Use the CLI commands above based on what the user wants
-4. **Report results**: Parse the JSON output and present it clearly
-
-### Example Auto Mode Flows
-
-**"Post something about AI on LinkedIn":**
-1. Check auth status
-2. Draft a professional post about AI
-3. Confirm with user before posting
-4. Execute: `python -m linkedin_skill.cli post "drafted text"`
+**User: "Post about AI trends on my LinkedIn"**
+1. Run `status` to check login
+2. Draft a professional post about AI trends
+3. Show the draft to the user and ask for approval
+4. On approval: `python -m linkedin_skill.cli post "drafted text"`
 5. Report success
 
-**"Engage with this post":**
-1. Check auth status
-2. React: `python -m linkedin_skill.cli react <urn> LIKE`
-3. Comment: `python -m linkedin_skill.cli comment <urn> "thoughtful comment"`
-4. Report success
+**User: "Find ML engineers and connect with them"**
+1. Run `status` to check login
+2. `python -m linkedin_skill.cli search-people "machine learning engineer" --limit 10`
+3. Show results to user
+4. Ask which ones to connect with
+5. For each approved: `python -m linkedin_skill.cli connect <public_id> --message "personalized message"`
 
-**"Check my profile":**
-1. Run `python -m linkedin_skill.cli profile`
-2. Display formatted profile info
+**User: "Check my messages"**
+1. Run `status` to check login
+2. `python -m linkedin_skill.cli conversations`
+3. Display conversations in readable format
+4. If user wants to read one: `python -m linkedin_skill.cli messages <id>`
 
-## Programmatic Usage (Python)
-
-The skill can also be used directly in Python:
-
-```python
-from linkedin_skill.auth import check_auth_status, start_auth_flow
-from linkedin_skill.operations.profile import get_profile
-from linkedin_skill.operations.posts import create_text_post
-from linkedin_skill.operations.engagement import react_to_post, comment_on_post
-from linkedin_skill.operations.connections import send_connection_request
-
-# Check auth
-status = check_auth_status()
-
-# Get profile
-profile = get_profile()
-
-# Create a post
-result = create_text_post("Hello LinkedIn from Claude Code!")
-
-# React to a post
-react_to_post("urn:li:ugcPost:123456", "LIKE")
-
-# Comment
-comment_on_post("urn:li:ugcPost:123456", "Great post!")
-
-# Connect with someone
-send_connection_request("urn:li:person:ABC123", message="Let's connect!")
-```
+**User: "Engage with my feed"**
+1. Run `status` to check login
+2. `python -m linkedin_skill.cli feed --limit 5`
+3. Show feed posts to user
+4. Ask which to engage with
+5. React/comment as requested
 
 ## Security Notes
 
-- Tokens are stored locally at `~/.config/claude-linkedin-skill/tokens.json` with `600` permissions (owner-only read/write)
-- The `.env` file containing client secrets is `.gitignore`d
-- Each user authenticates with their own LinkedIn account — no shared credentials
-- Always confirm with the user before posting or sending connection requests
+- Credentials are handled by the `linkedin-api` library which caches session cookies at `~/.linkedin_api/`
+- Session info stored at `~/.config/claude-linkedin-skill/session.json` (owner-only permissions)
+- Password is never stored — only used during login to establish a session
+- Always ask user for confirmation before taking actions that are visible to others

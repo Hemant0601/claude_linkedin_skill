@@ -1,62 +1,40 @@
-"""Configuration management for LinkedIn skill."""
+"""Configuration management for LinkedIn skill - stores session cookies securely."""
 
-import os
 import json
+import time
 from pathlib import Path
-from dotenv import load_dotenv
 
 CONFIG_DIR = Path.home() / ".config" / "claude-linkedin-skill"
-TOKEN_FILE = CONFIG_DIR / "tokens.json"
+SESSION_FILE = CONFIG_DIR / "session.json"
 
 
-def load_config():
-    """Load configuration from environment and .env file."""
-    load_dotenv()
-    return {
-        "client_id": os.getenv("LINKEDIN_CLIENT_ID", ""),
-        "client_secret": os.getenv("LINKEDIN_CLIENT_SECRET", ""),
-        "redirect_uri": os.getenv("LINKEDIN_REDIRECT_URI", "http://localhost:8585/callback"),
-    }
-
-
-def save_tokens(access_token, refresh_token=None, expires_in=None):
-    """Save OAuth tokens to local config."""
+def save_session(username, cookies=None):
+    """Save LinkedIn session info locally."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    data = {"access_token": access_token}
-    if refresh_token:
-        data["refresh_token"] = refresh_token
-    if expires_in:
-        import time
-        data["expires_at"] = int(time.time()) + expires_in
-    TOKEN_FILE.write_text(json.dumps(data, indent=2))
-    TOKEN_FILE.chmod(0o600)
+    data = {
+        "username": username,
+        "authenticated_at": int(time.time()),
+    }
+    if cookies:
+        data["cookies"] = cookies
+    SESSION_FILE.write_text(json.dumps(data, indent=2))
+    SESSION_FILE.chmod(0o600)
 
 
-def load_tokens():
-    """Load saved OAuth tokens."""
-    if TOKEN_FILE.exists():
-        data = json.loads(TOKEN_FILE.read_text())
-        return data
-    # Fallback to environment variable
-    token = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
-    if token:
-        return {"access_token": token}
+def load_session():
+    """Load saved session info."""
+    if SESSION_FILE.exists():
+        return json.loads(SESSION_FILE.read_text())
     return None
 
 
-def clear_tokens():
-    """Remove saved tokens."""
-    if TOKEN_FILE.exists():
-        TOKEN_FILE.unlink()
+def clear_session():
+    """Remove saved session."""
+    if SESSION_FILE.exists():
+        SESSION_FILE.unlink()
 
 
-def get_access_token():
-    """Get the current access token or None."""
-    tokens = load_tokens()
-    if not tokens:
-        return None
-    import time
-    expires_at = tokens.get("expires_at")
-    if expires_at and time.time() > expires_at:
-        return None
-    return tokens.get("access_token")
+def is_logged_in():
+    """Check if there's an active session."""
+    session = load_session()
+    return session is not None and "username" in session

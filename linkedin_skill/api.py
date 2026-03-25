@@ -1,231 +1,161 @@
-"""LinkedIn API client wrapper."""
+"""LinkedIn API client wrapper - uses linkedin-api (no developer app needed)."""
 
 import json
-import requests
+from linkedin_api import Linkedin
 
-from .config import get_access_token
-
-BASE_URL = "https://api.linkedin.com/v2"
-REST_BASE_URL = "https://api.linkedin.com/rest"
+from .config import load_session
 
 
 class LinkedInAPIError(Exception):
     """Raised when a LinkedIn API call fails."""
-    def __init__(self, status_code, message):
-        self.status_code = status_code
-        super().__init__(f"LinkedIn API error ({status_code}): {message}")
+    pass
+
+
+def get_client():
+    """Get an authenticated LinkedIn client from stored credentials.
+
+    The linkedin-api library caches cookies in ~/.linkedin_api/
+    so re-authentication is usually seamless after first login.
+    """
+    session = load_session()
+    if not session or "username" not in session:
+        raise LinkedInAPIError("Not logged in. Run: python -m linkedin_skill.cli login")
+
+    try:
+        # linkedin-api uses cookie-based auth and caches cookies automatically
+        api = Linkedin(session["username"], "", refresh_cookies=False)
+        return api
+    except Exception:
+        raise LinkedInAPIError(
+            "Session expired. Please log in again: python -m linkedin_skill.cli login"
+        )
 
 
 class LinkedInClient:
-    """Client for LinkedIn API operations."""
+    """High-level wrapper around linkedin-api for common operations."""
 
-    def __init__(self, access_token=None):
-        self.access_token = access_token or get_access_token()
-        if not self.access_token:
-            raise LinkedInAPIError(401, "Not authenticated. Run `linkedin auth` first.")
-
-    def _headers(self, version="202401"):
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-            "X-Restli-Protocol-Version": "2.0.0",
-        }
-        if version:
-            headers["LinkedIn-Version"] = version
-        return headers
-
-    def _get(self, url, params=None, use_rest=False):
-        base = REST_BASE_URL if use_rest else BASE_URL
-        full_url = f"{base}{url}" if url.startswith("/") else url
-        resp = requests.get(full_url, headers=self._headers(), params=params)
-        if resp.status_code != 200:
-            raise LinkedInAPIError(resp.status_code, resp.text)
-        return resp.json()
-
-    def _post(self, url, data, use_rest=False):
-        base = REST_BASE_URL if use_rest else BASE_URL
-        full_url = f"{base}{url}" if url.startswith("/") else url
-        resp = requests.post(full_url, headers=self._headers(), json=data)
-        if resp.status_code not in (200, 201):
-            raise LinkedInAPIError(resp.status_code, resp.text)
-        return resp.json() if resp.text else {"status": "success"}
-
-    def _delete(self, url, use_rest=False):
-        base = REST_BASE_URL if use_rest else BASE_URL
-        full_url = f"{base}{url}" if url.startswith("/") else url
-        resp = requests.delete(full_url, headers=self._headers())
-        if resp.status_code not in (200, 204):
-            raise LinkedInAPIError(resp.status_code, resp.text)
-        return {"status": "deleted"}
+    def __init__(self):
+        self.api = get_client()
 
     # --- Profile ---
 
     def get_my_profile(self):
-        """Get the authenticated user's profile via OpenID userinfo."""
-        resp = requests.get(
-            "https://api.linkedin.com/v2/userinfo",
-            headers=self._headers(version=None),
+        """Get the authenticated user's profile."""
+        return self.api.get_user_profile()
+
+    def get_profile(self, public_id):
+        """Get any user's profile by their public LinkedIn ID (the URL slug)."""
+        return self.api.get_profile(public_id)
+
+    def get_profile_connections(self):
+        """Get the authenticated user's connections."""
+        return self.api.get_profile_connections()
+
+    # --- Search ---
+
+    def search_people(self, keywords=None, limit=10, **kwargs):
+        """Search for people on LinkedIn."""
+        return self.api.search_people(
+            keywords=keywords,
+            limit=limit,
+            **kwargs,
         )
-        if resp.status_code != 200:
-            raise LinkedInAPIError(resp.status_code, resp.text)
-        return resp.json()
 
-    def get_person_urn(self):
-        """Get the authenticated user's person URN (sub claim)."""
-        profile = self.get_my_profile()
-        return profile.get("sub")
+    def search_companies(self, keywords=None, limit=10):
+        """Search for companies on LinkedIn."""
+        return self.api.search_companies(keywords=keywords, limit=limit)
 
-    # --- Posts / Shares ---
+    def search_jobs(self, keywords=None, limit=10, **kwargs):
+        """Search for jobs on LinkedIn."""
+        return self.api.search_jobs(keywords=keywords, limit=limit, **kwargs)
 
-    def create_text_post(self, text, visibility="PUBLIC"):
-        """Create a text-only post on LinkedIn."""
-        person_urn = self.get_person_urn()
-        payload = {
-            "author": f"urn:li:person:{person_urn}",
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": text},
-                    "shareMediaCategory": "NONE",
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": visibility},
-        }
-        return self._post("/ugcPosts", payload)
+    # --- Posts ---
 
-    def create_article_post(self, text, article_url, title=None, description=None, visibility="PUBLIC"):
-        """Create a post with an article/link attachment."""
-        person_urn = self.get_person_urn()
-        media = {
-            "status": "READY",
-            "originalUrl": article_url,
-        }
-        if title:
-            media["title"] = {"text": title}
-        if description:
-            media["description"] = {"text": description}
+    def create_post(self, text, visibility="PUBLIC"):
+        """Create a text post on LinkedIn."""
+        vis = visibility.upper()
+        return self.api.create_post(text, visibility=vis)
 
-        payload = {
-            "author": f"urn:li:person:{person_urn}",
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": text},
-                    "shareMediaCategory": "ARTICLE",
-                    "media": [media],
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": visibility},
-        }
-        return self._post("/ugcPosts", payload)
+    def create_post_with_link(self, text, url, title=None, visibility="PUBLIC"):
+        """Create a post with a link attachment."""
+        return self.api.create_post(
+            text,
+            visibility=visibility.upper(),
+            link_url=url,
+            link_title=title,
+        )
 
     def delete_post(self, post_urn):
-        """Delete a post by its URN."""
-        encoded = post_urn.replace(":", "%3A")
-        return self._delete(f"/ugcPosts/{encoded}")
+        """Delete a post by URN."""
+        return self.api.delete_post(post_urn)
 
-    # --- Reactions ---
+    # --- Engagement ---
 
     def react_to_post(self, post_urn, reaction_type="LIKE"):
         """React to a post. Types: LIKE, PRAISE, EMPATHY, INTEREST, APPRECIATION."""
-        person_urn = self.get_person_urn()
-        payload = {
-            "root": post_urn,
-            "reactionType": reaction_type,
-        }
-        encoded_actor = f"urn%3Ali%3Aperson%3A{person_urn}"
-        return self._post(f"/reactions?actor={encoded_actor}", payload)
-
-    # --- Comments ---
+        return self.api.react_post(post_urn, reaction_type)
 
     def comment_on_post(self, post_urn, text):
         """Add a comment to a post."""
-        person_urn = self.get_person_urn()
-        payload = {
-            "actor": f"urn:li:person:{person_urn}",
-            "message": {"text": text},
-        }
-        encoded_urn = post_urn.replace(":", "%3A")
-        return self._post(f"/socialActions/{encoded_urn}/comments", payload)
+        return self.api.comment_on_post(post_urn, text)
 
     def get_post_comments(self, post_urn, count=10):
         """Get comments on a post."""
-        encoded_urn = post_urn.replace(":", "%3A")
-        return self._get(f"/socialActions/{encoded_urn}/comments", params={"count": count})
+        return self.api.get_post_comments(post_urn, comment_count=count)
 
-    # --- Network / Connections ---
+    # --- Feed ---
 
-    def get_connections_count(self):
-        """Get the number of first-degree connections."""
-        return self._get("/connections?q=viewer&start=0&count=0")
+    def get_feed(self, limit=10):
+        """Get posts from your LinkedIn feed."""
+        return self.api.get_feed_posts(limit=limit)
 
-    def send_invitation(self, profile_urn, message=None):
-        """Send a connection invitation.
+    # --- Connections ---
 
-        profile_urn: The target person's URN (e.g., 'urn:li:person:ABC123')
+    def send_connection_request(self, public_id, message=None):
+        """Send a connection request to a user by public ID."""
+        return self.api.add_connection(public_id, message=message)
+
+    def remove_connection(self, public_id):
+        """Remove a connection."""
+        return self.api.remove_connection(public_id)
+
+    def get_pending_invitations(self):
+        """Get pending connection invitations."""
+        return self.api.get_invitations()
+
+    def accept_invitation(self, invitation_id, shared_secret):
+        """Accept a connection invitation."""
+        return self.api.reply_invitation(
+            invitation_entity_urn=invitation_id,
+            invitation_shared_secret=shared_secret,
+            action="accept",
+        )
+
+    # --- Messaging ---
+
+    def get_conversations(self, limit=20):
+        """Get recent conversations."""
+        return self.api.get_conversations(limit=limit)
+
+    def get_conversation_messages(self, conversation_id, limit=20):
+        """Get messages in a conversation."""
+        return self.api.get_conversation(conversation_id)
+
+    def send_message(self, recipients, text):
+        """Send a message to one or more people.
+
+        recipients: list of public_ids (URL slugs)
         """
-        payload = {
-            "invitee": profile_urn,
-            "message": {"text": message} if message else None,
-        }
-        payload = {k: v for k, v in payload.items() if v is not None}
-        return self._post("/invitations", payload)
+        if isinstance(recipients, str):
+            recipients = [recipients]
+        return self.api.send_message(message_body=text, recipients=recipients)
 
-    # --- Organization Pages ---
+    # --- Company / Organization ---
 
-    def get_organization(self, org_id):
-        """Get organization details by ID."""
-        return self._get(f"/organizations/{org_id}")
+    def get_company(self, public_id):
+        """Get company details by public ID."""
+        return self.api.get_company(public_id)
 
-    def create_org_post(self, org_id, text, visibility="PUBLIC"):
-        """Create a post on behalf of an organization page."""
-        payload = {
-            "author": f"urn:li:organization:{org_id}",
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": text},
-                    "shareMediaCategory": "NONE",
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": visibility},
-        }
-        return self._post("/ugcPosts", payload)
-
-    # --- Analytics ---
-
-    def get_post_analytics(self, post_urn):
-        """Get share statistics for a post."""
-        encoded = post_urn.replace(":", "%3A")
-        return self._get(f"/socialActions/{encoded}")
-
-    # --- Image Post ---
-
-    def create_image_post(self, text, image_url, title=None, visibility="PUBLIC"):
-        """Create a post with an image URL.
-
-        Note: For native image uploads, LinkedIn requires a multi-step process
-        (register upload -> upload binary -> create post). This simplified method
-        uses an image URL instead.
-        """
-        person_urn = self.get_person_urn()
-        media = {
-            "status": "READY",
-            "originalUrl": image_url,
-        }
-        if title:
-            media["title"] = {"text": title}
-
-        payload = {
-            "author": f"urn:li:person:{person_urn}",
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {"text": text},
-                    "shareMediaCategory": "IMAGE",
-                    "media": [media],
-                }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": visibility},
-        }
-        return self._post("/ugcPosts", payload)
+    def get_company_updates(self, public_id, limit=10):
+        """Get recent updates from a company page."""
+        return self.api.get_company_updates(public_id, max_results=limit)
