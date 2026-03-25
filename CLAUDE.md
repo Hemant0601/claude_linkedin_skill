@@ -2,9 +2,9 @@
 
 This project provides a LinkedIn automation skill. When a user asks anything about LinkedIn, use the CLI commands below.
 
-## Setup Check
+## Login Flow
 
-Before any operation, always check if dependencies are installed and user is logged in:
+Before any operation, check login status:
 ```bash
 python -m linkedin_skill.cli status
 ```
@@ -14,16 +14,17 @@ If the command fails with a module error, install first:
 pip install -e /home/user/claude_linkedin_skill
 ```
 
-If not logged in, tell the user to run this (it requires interactive input):
+If not logged in, start the browser-based login:
 ```bash
 python -m linkedin_skill.cli login
 ```
+This opens a local web page at `http://localhost:8585` where the user signs in with their LinkedIn email/password directly in the browser. Credentials go straight to LinkedIn — never stored or logged. Once they sign in, the session is saved automatically and the CLI reports success.
 
 ## Commands
 
 | Action | Command |
 |--------|---------|
-| Login | `python -m linkedin_skill.cli login` |
+| Login (browser) | `python -m linkedin_skill.cli login` |
 | Check login | `python -m linkedin_skill.cli status` |
 | Logout | `python -m linkedin_skill.cli logout` |
 | My profile | `python -m linkedin_skill.cli me` |
@@ -49,8 +50,9 @@ python -m linkedin_skill.cli login
 ## Rules
 
 1. **Always check login status** before running any LinkedIn operation
-2. **Always confirm with the user** before: posting, sending messages, sending connection requests, deleting anything
-3. **Never store or log** the user's LinkedIn password
-4. **Parse JSON output** and present results in a clean, readable format
-5. The `public_id` is the slug from a LinkedIn URL: `linkedin.com/in/john-doe` → `john-doe`
-6. Reaction types: `LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`
+2. **If not logged in**, run the login command — it opens the browser, user signs in there
+3. **Always confirm with the user** before: posting, sending messages, sending connection requests, deleting anything
+4. **Never store or log** the user's LinkedIn password
+5. **Parse JSON output** and present results in a clean, readable format
+6. The `public_id` is the slug from a LinkedIn URL: `linkedin.com/in/john-doe` → `john-doe`
+7. Reaction types: `LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`

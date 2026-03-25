@@ -1,10 +1,8 @@
 # Claude LinkedIn Skill
 
-A Claude Code skill to operate your LinkedIn account. No developer app, no API keys, no OAuth setup. Just log in and go.
+Operate your LinkedIn from Claude Code. No developer app, no API keys. Sign in via browser and go.
 
-## How to Deploy & Use with Claude Code
-
-### Step 1: Clone and Install
+## Setup
 
 ```bash
 git clone https://github.com/Hemant0601/claude_linkedin_skill.git
@@ -12,37 +10,22 @@ cd claude_linkedin_skill
 pip install -e .
 ```
 
-### Step 2: Register the Skill
-
-Copy the skill into your Claude Code user-level skills directory:
+### Register as a Claude Code slash command (optional)
 
 ```bash
 mkdir -p ~/.claude/skills/linkedin
 cp .claude/skills/linkedin/SKILL.md ~/.claude/skills/linkedin/SKILL.md
 ```
 
-This makes `/linkedin` available as a slash command across all your Claude Code projects.
+This makes `/linkedin` available as a slash command. Without this step, Claude still picks up the skill automatically via `CLAUDE.md`.
 
-### Step 3: Login to LinkedIn
+## Login
 
 ```bash
 python -m linkedin_skill.cli login
 ```
 
-Enter your LinkedIn email and password. That's it — no developer app, no API keys.
-
-### Step 4: Use It
-
-Open Claude Code and type `/linkedin` or just ask naturally:
-
-- "Post about AI trends on my LinkedIn"
-- "Search for ML engineers on LinkedIn"
-- "Check my LinkedIn messages"
-- "Connect with john-doe on LinkedIn"
-
-Claude reads the `CLAUDE.md` file automatically and knows how to use every command.
-
----
+A browser window opens with a LinkedIn sign-in page. Enter your credentials there — they go directly to LinkedIn, never stored or logged by this skill. Once signed in, the browser shows a success page and you're connected.
 
 ## What It Can Do
 
@@ -70,7 +53,7 @@ Claude reads the `CLAUDE.md` file automatically and knows how to use every comma
 ### Engagement
 | Command | What it does |
 |---------|-------------|
-| `linkedin react <urn> LIKE` | React to a post (LIKE, PRAISE, EMPATHY, INTEREST, APPRECIATION) |
+| `linkedin react <urn> LIKE` | React (LIKE, PRAISE, EMPATHY, INTEREST, APPRECIATION) |
 | `linkedin comment <urn> "<text>"` | Comment on a post |
 | `linkedin get-comments <urn>` | Read comments on a post |
 
@@ -93,40 +76,41 @@ Claude reads the `CLAUDE.md` file automatically and knows how to use every comma
 ### Session
 | Command | What it does |
 |---------|-------------|
-| `linkedin login` | Log in with email/password |
+| `linkedin login` | Opens browser to sign in |
 | `linkedin status` | Check if logged in |
 | `linkedin logout` | Log out |
 
----
+## Using with Claude Code
+
+Open Claude Code in this project directory and just ask:
+
+- "Post about AI trends on my LinkedIn"
+- "Search for ML engineers on LinkedIn"
+- "Check my LinkedIn messages"
+- "Connect with john-doe on LinkedIn"
+
+Claude reads `CLAUDE.md` automatically and handles everything — checking login, opening the browser for sign-in if needed, executing commands, and asking for your approval before any visible action.
 
 ## How It Works
 
-Uses the [`linkedin-api`](https://github.com/tomquirk/linkedin-api) library which authenticates directly with LinkedIn using your email/password — the same way the LinkedIn website works. No LinkedIn Developer App or OAuth registration needed.
-
-## How Claude Code Picks It Up
-
-This project uses two mechanisms so Claude automatically knows how to operate LinkedIn:
-
-1. **`CLAUDE.md`** (project root) — Claude reads this file automatically in every session. It contains the full command reference and rules (always confirm before posting, never store passwords, etc.)
-
-2. **`.claude/skills/linkedin/SKILL.md`** — Registers `/linkedin` as a slash command. Copy this to `~/.claude/skills/linkedin/SKILL.md` to make it available globally.
+Uses [`linkedin-api`](https://github.com/tomquirk/linkedin-api) which authenticates with LinkedIn the same way the website does. Login happens in your browser via a local page at `http://localhost:8585`. Your credentials are sent directly to LinkedIn's servers — this skill never stores or logs them.
 
 ## Security
 
-- **No credentials stored in the project** — password is only used during login to get a session cookie
-- **Session cookies** are cached locally by the library at `~/.linkedin_api/`
+- **Browser-based login** — credentials entered in your browser, not in Claude
+- **Credentials never stored** — only a session cookie is cached locally at `~/.linkedin_api/`
 - **Claude always asks for approval** before posting, messaging, connecting, or deleting
-- **`.gitignore`** prevents any secrets from being committed
+- **`.gitignore`** prevents secrets from being committed
 
 ## Project Structure
 
 ```
 claude_linkedin_skill/
-├── CLAUDE.md                          # Claude auto-reads this — command reference & rules
-├── .claude/skills/linkedin/SKILL.md   # Skill definition for /linkedin slash command
+├── CLAUDE.md                          # Claude auto-reads this every session
+├── .claude/skills/linkedin/SKILL.md   # /linkedin slash command definition
 ├── linkedin_skill/
 │   ├── cli.py                         # CLI entry point
-│   ├── auth.py                        # Login/logout/status
+│   ├── auth.py                        # Browser-based login server
 │   ├── api.py                         # LinkedIn API client wrapper
 │   ├── config.py                      # Session storage
 │   └── operations/
@@ -136,6 +120,6 @@ claude_linkedin_skill/
 │       ├── connections.py             # Connect/disconnect/invitations
 │       ├── messaging.py               # Conversations & messages
 │       └── search.py                  # Search people/companies/jobs
-├── pyproject.toml                     # Package config
-└── requirements.txt                   # linkedin-api dependency
+├── pyproject.toml
+└── requirements.txt
 ```

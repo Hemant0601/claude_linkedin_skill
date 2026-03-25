@@ -20,9 +20,8 @@ def main():
 
     # --- Authentication ---
     if command == "login":
-        username = _get_flag("--email") or (sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else None)
-        password = _get_flag("--password")
-        result = auth.login(username, password)
+        port = int(_get_flag("--port") or 8585)
+        result = auth.start_login_server(port)
         print_json(result)
 
     elif command == "status":
@@ -188,7 +187,7 @@ def print_usage():
     print("""LinkedIn Skill CLI - No developer app needed!
 
 Login:
-  login [email]                     Log in with your LinkedIn account
+  login                             Opens browser to sign in to LinkedIn
   status                            Check login status
   logout                            Log out
 
