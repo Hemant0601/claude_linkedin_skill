@@ -1,3 +1,9 @@
+---
+name: linkedin
+description: Operate your LinkedIn account - post, message, search, connect. No API keys needed.
+user-invocable: true
+---
+
 # LinkedIn Skill
 
 Operate your LinkedIn account directly from Claude Code. No developer app, no API keys, no OAuth setup. Just log in and go.
@@ -16,7 +22,7 @@ This skill uses the `linkedin-api` library which authenticates directly with Lin
 
 ## Auto Mode Instructions
 
-When the user wants to operate LinkedIn, Claude should:
+When the user invokes `/linkedin` or asks to operate LinkedIn, Claude should:
 
 1. **Always check login first**: `python -m linkedin_skill.cli status`
 2. **If not logged in**: Tell the user to run `python -m linkedin_skill.cli login` and enter their credentials
